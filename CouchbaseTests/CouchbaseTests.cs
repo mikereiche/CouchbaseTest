@@ -20,7 +20,7 @@ namespace CouchbaseTests
 {
     public class CouchbaseTests
     {
-        private string jsonFile = Environment.CurrentDirectory + @"\job.json";
+        private string jsonFile = Environment.CurrentDirectory + @"/../../../job.json";
 
         private JObject _baseJsonObject = null;
         private List<JObject> jsonObjects = new List<JObject>();
@@ -34,19 +34,19 @@ namespace CouchbaseTests
 
         public CouchbaseTests(string serviceStackLicense)
         { 
-            Licensing.RegisterLicense(serviceStackLicense); // ServiceStack licensing, if no license, dont test using Redis/SS, or replace lib
+           // Licensing.RegisterLicense(serviceStackLicense); // ServiceStack licensing, if no license, dont test using Redis/SS, or replace lib
             jsonObjects = new List<JObject>();
-            firstnames.AddRange(File.ReadAllText(Environment.CurrentDirectory + @"\firstnames.txt").Split(Environment.NewLine));
-            lastnames.AddRange(File.ReadAllText(Environment.CurrentDirectory + @"\lastnames.txt").Split(Environment.NewLine));
+            firstnames.AddRange(File.ReadAllText(Environment.CurrentDirectory + @"/../../../firstnames.txt").Split(Environment.NewLine));
+            lastnames.AddRange(File.ReadAllText(Environment.CurrentDirectory + @"/../../../lastnames.txt").Split(Environment.NewLine));
         }
 
         public async Task Init()
         {
-            try { aeroClient = new AerospikeClient("127.0.0.1", 3000); } catch { }
+            //try { aeroClient = new AerospikeClient("127.0.0.1", 3000); } catch { }
 
-            try { cluster = await Couchbase.Cluster.ConnectAsync("couchbase://localhost", "root", "root"); } catch { }
+            try { cluster = await Couchbase.Cluster.ConnectAsync("couchbase://localhost", "Administrator", "password"); } catch { }
             
-            try { redisManager = new RedisManagerPool("localhost:6379"); } catch { }
+           // try { redisManager = new RedisManagerPool("localhost:6379"); } catch { }
 
             _baseJsonObject = JObject.Parse(File.ReadAllText(jsonFile));
         }
@@ -207,10 +207,11 @@ namespace CouchbaseTests
             if (databases.HasFlag(Database.Couchbase))
             {
                 var options = new QueryOptions().Metrics(true);
-                IBucket bucket = await cluster.BucketAsync("halo");
+                IBucket bucket = await cluster.BucketAsync("myBucket");
                 IScope scope = bucket.Scope("myScope");
-                var collection = scope.Collection("myCollecton");
+                var collection = scope.Collection("myCollection");
 
+                long et = 0;
                 int lim = 10;
                 for (int q = 0; q < lim; q++)
                 {
@@ -218,18 +219,21 @@ namespace CouchbaseTests
                     Stopwatch sw = Stopwatch.StartNew();
                     for (int i = 0; i < nbr; i++)
                     {
-                        string query = $"SELECT * FROM jobcache WHERE JobId = {r.Next(1, 100000)}";
+                        string query = $"SELECT * FROM myCollection WHERE JobId = {r.Next(1, 100000)}";
                         //tasks.Add(scope.QueryAsync<dynamic>(query));
-                        var queryResult = await scope.QueryAsync<dynamic>(query, options);
+                        //var queryResult =  await scope.QueryAsync<dynamic>(query);
+                        //var content = queryResult.Rows;
 
-                        //string key = $"{r.Next(1, 100000)}";
-                        //var result = await collection.GetAsync(key, options: new GetOptions().Transcoder(new LegacyTranscoder()));
-                        //var content = result.ContentAs<string>();
+                        string key = $"{r.Next(1, 100000)}";
+                        var result = await collection.GetAsync(key, options: new GetOptions().Transcoder(new LegacyTranscoder()));
+                        var content = result.ContentAs<string>();
                     }
                     // await Task.WhenAll(tasks);
                     sw.Stop();
                     Console.WriteLine($"Couchbase Q: {q}\t{sw.ElapsedMilliseconds}");
+                    et = et + sw.ElapsedMilliseconds;
                 }
+                Console.WriteLine($"average et: {et/lim} ms per {nbr} -> {et/lim * 1000 / nbr} usec / request");
             }
 
 
